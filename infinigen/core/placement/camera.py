@@ -661,8 +661,11 @@ def configure_cameras(
     mvs_setting=False,
     mvs_radius=("uniform", 12, 18),
     n_views: int = None,
+    n_base_views: int = 5,
     **kwargs,
 ):
+    # n_base_views: start poses kept for trajectory search. v1.19 hard-coded 1, so a single
+    # start pose rejected by compute_trajectories failed the whole scene (upstream main uses 5).
     bpy.context.view_layer.update()
 
     if init_bounding_box is not None:
@@ -717,7 +720,7 @@ def configure_cameras(
     for cam_rig in cam_rigs:
         views = compute_base_views(
             cam_rig,
-            n_views=1,
+            n_views=n_base_views,
             location_sample=location_sample,
             center_coordinate=center_coordinate,
             radius=mvs_radius,

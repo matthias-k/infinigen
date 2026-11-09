@@ -112,6 +112,9 @@ def compute_trajectories(
             cam.rotation_euler = proposal.rot
 
             if not anim_valid_pose_func(cam):
+                logger.info(
+                    f"Base view {i}/{len(base_views)}: start pose rejected by {anim_valid_pose_func}"
+                )
                 continue
 
             match animation_mode:

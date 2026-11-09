@@ -359,13 +359,20 @@ def compose_nature(output_folder, scene_seed, **params):
             and not obj.hide_render
             and "atmosphere" not in obj.name
         ]
-        cam_traj.animate_trajectories(
-            cam_rigs=camera_rigs,
-            base_views=poses,
-            scene_preprocessed=scene_preprocessed,
-            obj_groups=[objs],
-            pois=pois,
-        )
+        try:
+            cam_traj.animate_trajectories(
+                cam_rigs=camera_rigs,
+                base_views=poses,
+                scene_preprocessed=scene_preprocessed,
+                obj_groups=[objs],
+                pois=pois,
+            )
+        except ValueError:
+            # keep the scene so failed trajectory searches can be inspected in Blender
+            failed_path = output_folder / "animate_cameras_failed.blend"
+            logger.warning(f"animate_cameras failed, saving scene to {failed_path}")
+            butil.save_blend(failed_path)
+            raise
         for o in hidden_objs:
             o.hide_viewport = True
         for c in hidden_cols:
