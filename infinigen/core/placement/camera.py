@@ -329,15 +329,17 @@ def keep_cam_pose_proposal(
     min_terrain_distance=0,
     terrain_coverage_range=(0.5, 1),
 ):
+    if not cam.type == "CAMERA":
+        raise ValueError(f"{cam.name=} had {cam.type=}")
+
+    # update first: matrix_world is stale after setting location/rotation (or applying a rig
+    # pose), and the SDF query below would otherwise test the camera's previous position
+    bpy.context.view_layer.update()
+
     if terrain is not None:  # TODO refactor
         terrain_sdf = terrain.compute_camera_space_sdf(
             np.array(cam.matrix_world.translation).reshape((1, 3))
         )
-
-    if not cam.type == "CAMERA":
-        raise ValueError(f"{cam.name=} had {cam.type=}")
-
-    bpy.context.view_layer.update()
 
     # Reject cameras too close to any placeholder vertex
     v, i, dist_to_placeholder = placeholders_kd.find(cam.matrix_world.translation)
