@@ -371,7 +371,7 @@ def compose_nature(output_folder, scene_seed, **params):
             # keep the scene so failed trajectory searches can be inspected in Blender
             failed_path = output_folder / "animate_cameras_failed.blend"
             logger.warning(f"animate_cameras failed, saving scene to {failed_path}")
-            butil.save_blend(failed_path)
+            butil.save_blend(failed_path, compress=True)
             raise
         for o in hidden_objs:
             o.hide_viewport = True

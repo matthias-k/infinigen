@@ -780,14 +780,14 @@ def recalc_normals(obj, inside=False):
         bpy.ops.mesh.normals_make_consistent(inside=inside)
 
 
-def save_blend(path, autopack=False, verbose=False):
+def save_blend(path, autopack=False, verbose=False, compress=False):
     if verbose:
         print(f"Saving .blend to {path} ({'with' if autopack else 'without'} textures)")
 
     with Suppress():
         if autopack:
             bpy.ops.file.autopack_toggle()
-        bpy.ops.wm.save_as_mainfile(filepath=str(path))
+        bpy.ops.wm.save_as_mainfile(filepath=str(path), compress=compress)
         if autopack:
             bpy.ops.file.autopack_toggle()
 

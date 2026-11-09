@@ -194,6 +194,7 @@ def execute_tasks(
     dryrun=False,
     optimize_terrain_diskusage=False,
     point_trajectory_src_frame=1,
+    compress_blend=False,  # zstd-compress saved .blend files (~2.7x smaller; Blender reads them transparently)
 ):
     if input_folder != output_folder:
         if reset_assets:
@@ -295,7 +296,8 @@ def execute_tasks(
                 )
             else:
                 bpy.ops.wm.save_mainfile(
-                    filepath=str(output_folder / output_blend_name)
+                    filepath=str(output_folder / output_blend_name),
+                    compress=compress_blend,
                 )
 
         tag_system.save_tag(path=str(output_folder / "MaskTag.json"))
