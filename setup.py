@@ -23,6 +23,9 @@ MINIMAL_INSTALL = os.environ.get("INFINIGEN_MINIMAL_INSTALL") == str_true
 BUILD_TERRAIN = os.environ.get("INFINIGEN_INSTALL_TERRAIN", str_true) == str_true
 BUILD_OPENGL = os.environ.get("INFINIGEN_INSTALL_CUSTOMGT", "False") == str_true
 BUILD_BNURBS = os.environ.get("INFINIGEN_INSTALL_BNURBS", "False") == str_true
+# Set when the caller has already initialised the submodules it needs (e.g. only OcMesher and
+# infinigen_gpl for nature scenes), so the build does not clone every submodule from the network.
+SKIP_SUBMODULES = os.environ.get("INFINIGEN_SKIP_SUBMODULE_UPDATE") == str_true
 
 dont_build_steps = ["clean", "egg_info", "dist_info", "sdist", "--help"]
 is_build_step = not any(x in sys.argv[1] for x in dont_build_steps)
@@ -44,7 +47,7 @@ def ensure_submodules():
         )
 
 
-if not MINIMAL_INSTALL:
+if not MINIMAL_INSTALL and not SKIP_SUBMODULES:
     ensure_submodules()
 
 # inspired by https://github.com/pytorch/pytorch/blob/161ea463e690dcb91a30faacbf7d100b98524b6b/setup.py#L290
