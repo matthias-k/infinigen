@@ -156,6 +156,7 @@ def configure_compositor_output(
     image_noisy,
     passes_to_save,
     saving_ground_truth,
+    save_image_exr=True,
 ):
     file_output_node_png = nw.new_node(
         Nodes.OutputFile,
@@ -217,10 +218,12 @@ def configure_compositor_output(
     nw.links.new(image, default_file_output_node.inputs["Image"])
     if saving_ground_truth:
         slot_input.path = "UniqueInstances"
-    else:
+    elif save_image_exr:
         nw.links.new(image, file_output_node_exr.inputs["Image"])
         file_slot_list.append(file_output_node_exr.file_slots[slot_input.path])
     file_slot_list.append(default_file_output_node.file_slots[slot_input.path])
+    if not any(socket.is_linked for socket in file_output_node_exr.inputs):
+        nw.nodes.remove(file_output_node_exr)  # nothing left to save as EXR
 
     return file_slot_list
 
