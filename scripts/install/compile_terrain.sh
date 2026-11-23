@@ -138,6 +138,28 @@ echo "compiled lib/cpu/soil_machine/SoilMachine.so"
 
 cd -
 
+# Local fixes to the OcMesher submodule (scripts/install/patches/ocmesher/*.patch, video-pilot fork): applied for the
+# build and reverted afterwards, so the submodule stays at its pinned commit. A patch that neither applies nor is
+# already applied stops the build.
+ocmesher_patches=(scripts/install/patches/ocmesher/*.patch)
+for p in "${ocmesher_patches[@]}"; do
+    [ -f "$p" ] || continue
+    if git -C infinigen/OcMesher apply --check "$PWD/$p" 2>/dev/null; then
+        git -C infinigen/OcMesher apply "$PWD/$p"
+        echo "applied $p"
+    elif git -C infinigen/OcMesher apply -R --check "$PWD/$p" 2>/dev/null; then
+        echo "already applied: $p"
+    else
+        echo "$p does not apply to infinigen/OcMesher" >&2
+        exit 1
+    fi
+done
+
 cd ./infinigen/OcMesher
 source install.sh
 cd -
+
+for p in "${ocmesher_patches[@]}"; do
+    [ -f "$p" ] || continue
+    git -C infinigen/OcMesher apply -R "$PWD/$p" && echo "reverted $p"
+done

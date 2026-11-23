@@ -1,0 +1,21 @@
+diff --git a/ocmesher/source/core.cpp b/ocmesher/source/core.cpp
+index 4e0f099..dff4798 100644
+--- a/ocmesher/source/core.cpp
++++ b/ocmesher/source/core.cpp
+@@ -907,8 +907,14 @@ extern "C" {
+                         if (k == edge_vertices[i].first) v[k] += (j*2-1) * mid;
+                     }
+                 }
+-            assert(w != 0);
+-            for (int k = 0; k < 3; k++) everts[i * 3 + k] = v[k] / w;
++            // no sample pair straddles the surface (float precision at an octree level transition): fall back to
++            // the edge centre, as finalize_verts and the face-vertex loop below already do, instead of asserting
++            if (w == 0) {
++                for (int k = 0; k < 3; k++) everts[i * 3 + k] = edge_vertices[i].second.c[k];
++            }
++            else {
++                for (int k = 0; k < 3; k++) everts[i * 3 + k] = v[k] / w;
++            }
+         }
+         edge_vertices.clear();
+         for (int i = 0; i < face_vertices.size(); i++) {
