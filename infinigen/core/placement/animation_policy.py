@@ -363,6 +363,23 @@ def validate_keyframe_range(
     return True
 
 
+def _policy_state(policy_func):
+    """Snapshot of a policy's attributes (e.g. the walk direction of AnimPolicyRandomWalkLookaround), or None."""
+    try:
+        return deepcopy(vars(policy_func))
+    except Exception:  # functions, or attributes that cannot be copied (e.g. Blender objects)
+        return None
+
+
+def _delete_keyframes(obj, frame):
+    paths = {fc.data_path for fc in obj.animation_data.action.fcurves if fc.data_path}
+    for path in paths:
+        obj.keyframe_delete(data_path=path, frame=frame)
+    for fc in obj.animation_data.action.fcurves:
+        fc.update()  # recompute the Bezier handles of the remaining keyframes
+
+
+@gin.configurable
 def try_animate_trajectory(
     obj: bpy.types.Object,
     bvh: BVHTree,
@@ -372,13 +389,36 @@ def try_animate_trajectory(
     validate_pose_func=None,
     max_step_tries=50,
     verbose=True,
+    max_backtracks=0,
+    backtrack_steps=2,
+    fcurve_smoothing=None,
 ):
-    frame_prev = bpy.context.scene.frame_start
-    frame_curr = bpy.context.scene.frame_start
+    """Add keyframes step by step until `duration_frames` are covered; False if a step fails `max_step_tries` times.
+
+    max_backtracks: when a step fails, remove accepted steps and continue from the pose before them instead of
+        giving up, at most this many times per call (0: give up at once, Infinigen's behaviour; animate_trajectory
+        then restarts the whole path from its first frame).
+    backtrack_steps: steps removed at a dead end; one more each time the search gets stuck again without passing
+        its furthest dead end so far.
+    fcurve_smoothing: auto-smoothing of obj's animation curves (None: Blender's default, 'CONT_ACCEL', with which a
+        new keyframe also bends the curve two or more keyframes back, where it is not validated again; 'NONE':
+        handles depend only on the neighbouring keyframes, so validating from the previous keyframe covers every
+        frame a new step changes).
+    """
+    start = bpy.context.scene.frame_start
+    frame_prev = start
+    frame_curr = start
+    start_pose = (copy(obj.location), copy(obj.rotation_euler))
+    history = []  # accepted steps: (end frame, location, rotation, policy state before the step)
+    backtracks, depth, furthest_dead_end = 0, backtrack_steps, -1
+    if fcurve_smoothing is not None and obj.animation_data and obj.animation_data.action:
+        for fc in obj.animation_data.action.fcurves:
+            fc.auto_smoothing = fcurve_smoothing
     pbar = tqdm(total=duration_frames) if verbose else None
-    while frame_curr < bpy.context.scene.frame_start + duration_frames:
+    while frame_curr < start + duration_frames:
         orig_loc = copy(obj.location)
         orig_rot = copy(obj.rotation_euler)
+        state = _policy_state(policy_func) if max_backtracks else None
         for retry in range(max_step_tries):
             obj.location, obj.rotation_euler = orig_loc, orig_rot
             bpy.context.view_layer.update()
@@ -420,15 +460,44 @@ def try_animate_trajectory(
                 pbar.update(
                     min(
                         step_frames,
-                        bpy.context.scene.frame_start + duration_frames - frame_curr,
+                        start + duration_frames - frame_curr,
                     )
                 )  # dont overshoot the pbar, it makes the formatting not nice
 
             break  # we found a good pose
 
         else:  # for-else block triggers when for loop terminates w/o a break statement
-            return False
+            if backtracks >= max_backtracks or not history:
+                return False
+            # back up: drop the last `depth` accepted steps and continue from the pose before them
+            if frame_curr > furthest_dead_end:
+                depth, furthest_dead_end = backtrack_steps, frame_curr
+            else:
+                depth += 1
+            n = min(depth, len(history))
+            removed = history[-n:]
+            del history[-n:]
+            for frame, *_ in reversed(removed):
+                _delete_keyframes(obj, frame)
+            if removed[0][3] is not None:
+                vars(policy_func).update(deepcopy(removed[0][3]))
+            frame_old = frame_curr
+            frame_curr = history[-1][0] if history else start
+            frame_prev = history[-2][0] if len(history) > 1 else start
+            obj.location, obj.rotation_euler = (
+                (copy(history[-1][1]), copy(history[-1][2])) if history else start_pose
+            )
+            bpy.context.scene.frame_current = frame_curr
+            backtracks += 1
+            logger.info(
+                f"Backtracked {n} steps from frame {frame_old} to {frame_curr} ({backtracks}/{max_backtracks})"
+            )
+            if verbose:
+                pbar.update(frame_curr - min(frame_old, start + duration_frames))
+            continue
 
+        history.append((step_end_frame, copy(obj.location) if loc is None else Vector(loc),
+                        copy(obj.rotation_euler) if rot is None else Euler(rot), state))
         frame_prev = frame_curr
         frame_curr = step_end_frame
         bpy.context.scene.frame_current = frame_curr
